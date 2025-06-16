@@ -16,6 +16,12 @@
     <div class="nexus">
         {% for area, data in leaderboard_data.items() %}
             <div class="area">
+                {% if loop.first %}
+                <div class="columns-header-row">
+                    <div class="columns-header-left">Scores</div>
+                    <div class="columns-header-right">Times</div>
+                </div>
+                {% endif %}
                 <div class="subtables-row">
                     <div class="subtable">
                         <div class="area-title">{{ area }}</div>
