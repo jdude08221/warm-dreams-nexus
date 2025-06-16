@@ -3,3 +3,5 @@ requests
 gunicorn
 jsonschema
 aiohttp
+flask[async]
+hypercorn

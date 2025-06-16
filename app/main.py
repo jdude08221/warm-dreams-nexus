@@ -1,6 +1,6 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 import asyncio
-from .dustkid_api import fetch_all_levels_for_area
+from .dustkid_api import fetch_all_levels_all_areas, fetch_all_levels_for_area
 import datetime
 import pprint
 import os
@@ -86,13 +86,6 @@ AREAS = {
     "Rainlands": ["Rainlands1", "Rainlands2", "Rainlands3", "Rainlands4", "Rainlands5", "Rainlands6", "Rainlands7", "Rainlands8", "Rainlands9", "Rainlands10", "Rainlands11", "Rainlands12", "Rainlands13", "Rainlands14", "Rainlands15", "Rainlands16"],
 }
 
-# Create and set a single global event loop for the app
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
-
-def run_async(coro):
-    return loop.run_until_complete(coro)
-
 def get_level_url(level_name, rank):
     # rank is 1-based, so subtract 1 before floor division
     if rank == "N/A" or not isinstance(rank, int):
@@ -137,20 +130,17 @@ def index():
     if request.method == "POST":
         user_id = request.form.get("user_id")
         print(f"User ID: {user_id}")
-        for area, level_keys in AREAS.items():
-            print(f"Processing area: {area}")
-            results = run_async(fetch_all_levels_for_area(level_keys, user_id, LEVELS))
+        # Fetch all levels for all areas concurrently
+        grouped_results = run_async(fetch_all_levels_all_areas(AREAS, user_id, LEVELS))
+        for area, results in grouped_results.items():
             area_scores = []
             area_times = []
-            for idx, level_key in enumerate(level_keys):
-                print(f'  Fetching data for leaderboard "{level_key}" (level_id: {LEVELS.get(level_key)})')
-                result = results[idx]
+            for level_key, result in results:
+                level_name = LEVELS[level_key]
                 # Scores
                 rank, entry = result["score"]
-                level_name = LEVELS[level_key]
                 if entry:
                     rank_val = rank if isinstance(rank, int) else None
-                    print(f"Appending to area_scores: {level_name}, rank: {rank}")
                     area_scores.append({
                         "level": level_name,
                         "level_url": get_level_url(level_name, rank_val),
@@ -165,7 +155,6 @@ def index():
                         "time_of_pb": time_ago(entry.get("timestamp")) if entry else "N/A",
                     })
                 else:
-                    print(f'    User {user_id} NOT found in scores for "{level_key}"')
                     area_scores.append({
                         "level": level_name,
                         "rank": "N/A",
@@ -178,11 +167,8 @@ def index():
                     })
                 # Times
                 rank, entry = result["time"]
-                level_name = LEVELS[level_key]
                 if entry:
-                    print(f'    Found user {user_id} in times for "{level_key}" at rank {rank}')
                     rank_val = rank if isinstance(rank, int) else None
-                    print(f"Appending to area_times: {level_name}, rank: {rank}")
                     area_times.append({
                         "level": level_name,
                         "level_url": get_level_url(level_name, rank_val),
@@ -197,7 +183,6 @@ def index():
                         "time_of_pb": time_ago(entry.get("timestamp")) if entry else "N/A",
                     })
                 else:
-                    print(f'    User {user_id} NOT found in times for "{level_key}"')
                     area_times.append({
                         "level": level_name,
                         "rank": "N/A",
@@ -219,6 +204,80 @@ def index():
         leaderboard_data=leaderboard_data,
         user_id=user_id
     )
+
+@app.route("/area_data", methods=["POST"])
+async def area_data():
+    data = request.get_json()
+    area = data.get("area")
+    user_id = data.get("user_id")
+    if not area or not user_id or area not in AREAS:
+        return jsonify({"error": "Invalid area or user_id"}), 400
+    results = await fetch_all_levels_for_area(AREAS[area], user_id, LEVELS)
+    area_scores = []
+    area_times = []
+    for level_key, result in zip(AREAS[area], results):
+        level_name = LEVELS[level_key]
+        # Scores
+        rank, entry = result["score"]
+        if entry:
+            rank_val = rank if isinstance(rank, int) else None
+            area_scores.append({
+                "level": level_name,
+                "level_url": get_level_url(level_name, rank_val),
+                "rank": rank,
+                "character": entry.get("character") if entry else None,
+                "character_img": get_character_img(entry.get("character")) if entry else None,
+                "score_completion": map_score_letter(entry.get("score_completion")) if entry else "N/A",
+                "score_finesse": map_score_letter(entry.get("score_finesse")) if entry else "N/A",
+                "time": format_time(entry.get("time")) if entry else "N/A",
+                "replay_id": entry.get("replay_id") if entry else None,
+                "time_off_world_record": "-",
+                "time_of_pb": time_ago(entry.get("timestamp")) if entry else "N/A",
+            })
+        else:
+            area_scores.append({
+                "level": level_name,
+                "rank": "N/A",
+                "character": "N/A",
+                "score_completion": "N/A",
+                "score_finesse": "N/A",
+                "time": "N/A",
+                "time_off_world_record": "N/A",
+                "time_of_pb": "N/A",
+            })
+        # Times
+        rank, entry = result["time"]
+        if entry:
+            rank_val = rank if isinstance(rank, int) else None
+            area_times.append({
+                "level": level_name,
+                "level_url": get_level_url(level_name, rank_val),
+                "rank": rank,
+                "character": entry.get("character") if entry else None,
+                "character_img": get_character_img(entry.get("character")) if entry else None,
+                "score_completion": map_score_letter(entry.get("score_completion")) if entry else "N/A",
+                "score_finesse": map_score_letter(entry.get("score_finesse")) if entry else "N/A",
+                "time": format_time(entry.get("time")) if entry else "N/A",
+                "replay_id": entry.get("replay_id") if entry else None,
+                "time_off_world_record": "-",
+                "time_of_pb": time_ago(entry.get("timestamp")) if entry else "N/A",
+            })
+        else:
+            area_times.append({
+                "level": level_name,
+                "rank": "N/A",
+                "character": "N/A",
+                "score_completion": "N/A",
+                "score_finesse": "N/A",
+                "time": "N/A",
+                "time_off_world_record": "N/A",
+                "time_of_pb": "N/A",
+            })
+    return jsonify({
+        "area": area,
+        "scores": area_scores,
+        "times": area_times
+    })
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))

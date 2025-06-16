@@ -1,5 +1,12 @@
 import aiohttp
 import asyncio
+import logging
+
+# Configure logging for this module
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(message)s',
+)
 
 async def fetch_leaderboard_page(session, level_id, page_number):
     url = f"https://dustkid.com/json/level/{level_id}/all/{page_number}"
@@ -44,6 +51,7 @@ async def fetch_user_leaderboard_for_level(session, level_id, user_id, semaphore
                 user_time_entry = entry
                 break
 
+        logging.info(f"Fetched results for level_id={level_id} user_id={user_id}")
         return {
             "score": (user_score_rank, user_score_entry),
             "time": (user_time_rank, user_time_entry)
@@ -57,3 +65,20 @@ async def fetch_all_levels_for_area(level_keys, user_id, levels_dict):
             for level_key in level_keys if level_key in levels_dict
         ]
         return await asyncio.gather(*tasks)
+
+async def fetch_all_levels_all_areas(areas_dict, user_id, levels_dict):
+    semaphore = asyncio.Semaphore(32)  # Increase concurrency if desired
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        level_area_pairs = []
+        for area, level_keys in areas_dict.items():
+            for level_key in level_keys:
+                if level_key in levels_dict:
+                    tasks.append(fetch_user_leaderboard_for_level(session, levels_dict[level_key], user_id, semaphore))
+                    level_area_pairs.append((area, level_key))
+        results = await asyncio.gather(*tasks)
+        # Group results by area
+        grouped = {area: [] for area in areas_dict}
+        for (area, level_key), result in zip(level_area_pairs, results):
+            grouped[area].append((level_key, result))
+        return grouped
