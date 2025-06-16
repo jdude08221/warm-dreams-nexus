@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request
 import asyncio
-from dustkid_api import fetch_all_levels_for_area
+from .dustkid_api import fetch_all_levels_for_area
 import datetime
 import pprint
 import os
