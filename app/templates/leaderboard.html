@@ -102,7 +102,7 @@ document.getElementById('user-form').addEventListener('submit', async function(e
     loadingBar.style.width = '0';
     loadingBarContainer.style.display = 'block';
     nexus.innerHTML = '';
-    await Promise.resolve(); // Yield to browser to render loading bar
+    await new Promise(r => setTimeout(r, 0)); // Force browser to paint loading bar
     let loaded = 0;
     const areaResults = {};
     // Start all fetches in parallel

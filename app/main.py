@@ -41,7 +41,7 @@ LEVELS = {
     "Mountain11": "Sheer-Reflection-13550",
     "Mountain12": "Mountainside-Cavern-13551",
     "Mountain13": "Cordillera-13552",
-    "Mountain14": "Treeline-13553",
+    "Mountain14": "Treeline-13601",
     "Mountain15": "The-Peak-13554",
     "Mountain16": "Petaldrift-13555",
     "Ocean1": "Driftwood-13556",
@@ -102,8 +102,9 @@ def map_score_letter(val):
     return {5: "S", 4: "A", 3: "B", 2: "C", 1: "D"}.get(val, "N/A")
 
 def get_character_img(character):
-    if character in [1, 2, 3, 4]:
-        return f"img/head000{character}.png"
+    # character is 0-indexed from API, images are 1-indexed
+    if isinstance(character, int) and 0 <= character <= 3:
+        return f"img/head000{character+1}.png"
     return None
 
 def time_ago(ts):
