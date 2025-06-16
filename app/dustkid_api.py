@@ -51,7 +51,6 @@ async def fetch_user_leaderboard_for_level(session, level_id, user_id, semaphore
                 user_time_entry = entry
                 break
 
-        logging.info(f"Fetched results for level_id={level_id} user_id={user_id}")
         return {
             "score": (user_score_rank, user_score_entry),
             "time": (user_time_rank, user_time_entry)

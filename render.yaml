@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: warm-dreams-nexus
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: hypercorn app.main:app
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9
